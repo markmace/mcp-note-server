@@ -7,7 +7,7 @@ A Python MCP server that gives Claude read/write access to your notes stored in 
 - Notes live in a GitHub repo as plain markdown files
 - This server wraps the GitHub API and exposes 4 MCP tools
 - Connect it to claude.ai as a custom connector
-- Edit notes however you want (Obsidian, VS Code, etc.) — Claude can read and update them too
+- Edit notes in Obsidian (Mac + iOS) — Claude can read and update them too
 
 ## MCP tools
 
@@ -17,6 +17,8 @@ A Python MCP server that gives Claude read/write access to your notes stored in 
 | `read_note(path)` | Returns the full content of a note |
 | `write_note(path, content, commit_message?)` | Creates or updates a note |
 | `search_notes(query)` | Case-insensitive search across all notes, returns snippets |
+
+---
 
 ## Deploy to Fly.io
 
@@ -57,6 +59,69 @@ fly deploy
 1. **Settings → Connectors → Add custom connector**
 2. URL: `https://<app-name>.fly.dev/mcp/<MCP_TOKEN>`
 3. Save. No OAuth needed. Works on web and mobile.
+
+---
+
+## Obsidian setup (Mac)
+
+Obsidian + Obsidian Git is the recommended way to edit notes locally.
+
+### 1. Clone the notes repo
+
+```bash
+git clone https://github.com/youruser/your-notes-repo ~/notes
+```
+
+### 2. Open as vault
+
+Open Obsidian → "Open folder as vault" → select the cloned folder.
+
+### 3. Install Obsidian Git
+
+Community Plugins → Browse → search "Obsidian Git" (by Vinzent03) → Install → Enable.
+
+### 4. Configure the plugin
+
+Go to Settings → Obsidian Git and set:
+
+| Setting | Value |
+|---|---|
+| Auto commit-and-sync interval | 10 |
+| Auto pull interval | 10 |
+| Pull on startup | ✅ |
+| Push on commit-and-sync | ✅ |
+| Auto commit-and-sync after file edits | ✅ |
+
+Under **Authentication/Commit Author**:
+- Username: your GitHub username
+- Password: your GitHub PAT (`ghp_...` with `repo` scope)
+
+macOS caches the token in Keychain after the first successful push.
+
+### 5. Add a .gitignore to the vault
+
+Create `.gitignore` in the vault root to avoid syncing Obsidian workspace state:
+
+```
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.trash/
+```
+
+---
+
+## Obsidian setup (iOS)
+
+The plugin uses its own JS git implementation on iOS — no system git required.
+
+1. Install Obsidian on iPhone
+2. Enable Obsidian Git in Community Plugins
+3. Settings → Obsidian Git → **Authentication/Commit Author** → enter GitHub username and PAT
+4. Tap **"Clone an existing remote repo"** → enter `https://github.com/youruser/your-notes-repo`
+
+iOS doesn't background-sync. Use the command palette → "Obsidian Git: Commit all changes and sync" manually before closing the app.
+
+---
 
 ## Local dev
 
