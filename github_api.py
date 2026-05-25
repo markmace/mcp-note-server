@@ -80,6 +80,21 @@ async def write_note(path: str, content: str, message: str) -> str:
     return r.json()["commit"]["sha"]
 
 
+async def delete_note(path: str, message: str) -> str:
+    """Delete a file. Returns the commit SHA."""
+    _, sha = await read_note(path)
+    async with httpx.AsyncClient() as client:
+        r = await client.request(
+            "DELETE",
+            f"{_BASE}/repos/{GITHUB_REPO}/contents/{path}",
+            headers=_HEADERS,
+            json={"message": message, "sha": sha},
+            timeout=15,
+        )
+        r.raise_for_status()
+    return r.json()["commit"]["sha"]
+
+
 async def search_notes(query: str) -> list[dict]:
     """Search all markdown files for query (case-insensitive). Returns matching files + snippets."""
     files = await list_notes()

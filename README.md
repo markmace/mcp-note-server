@@ -26,16 +26,22 @@ flowchart LR
 
 GitHub is the source of truth. You write through Obsidian. Claude writes through the MCP server. Everyone's reading and writing the same files.
 
-Four tools Claude can call:
+The tools Claude can call:
 
 | Tool | What it does |
 |---|---|
 | `list_notes(folder?)` | List all markdown files, optionally filtered |
 | `read_note(path)` | Read a note's content |
-| `write_note(path, content, message?)` | Create or update a note |
 | `search_notes(query)` | Case-insensitive search across all notes |
+| `edit_note(path, old_text, new_text, replace_all?)` | Surgical find/replace — the preferred edit |
+| `append_to_note(path, text)` | Add to the end of a note (journals, logs, lists) |
+| `write_note(path, content)` | Create a new note or full rewrite (use sparingly) |
+| `rename_note(old, new)` | Rename or move a note |
+| `delete_note(path)` | Delete a note — destructive, requires confirmation |
 
 Every write is a git commit, so you have full history and can roll anything back.
+
+The edit/append/write split is deliberate — `edit_note` only changes what you specify, which prevents Claude from accidentally clobbering content it didn't mean to touch, keeps token usage low, and produces clean git diffs. `write_note` is the escape hatch for new files and full rewrites.
 
 ---
 
