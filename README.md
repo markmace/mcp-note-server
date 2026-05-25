@@ -1,133 +1,163 @@
 # mcp-note-server
 
-A Python MCP server that gives Claude read/write access to your notes stored in a GitHub repo. Edit in Obsidian, let Claude help clean things up.
+Give Claude a key to your notes.
+
+## Why
+
+I take notes in Obsidian. Claude is the best writing partner I've found. But the two don't talk to each other — I was constantly copy-pasting between them.
+
+This fixes that. Notes live in a GitHub repo. Obsidian edits them locally and syncs via git. A small MCP server lets Claude read and write the same files. Now I can say "Claude, clean up my standup notes from this week" and it actually does — no copy, no paste, no upload.
+
+It works on iPhone too, because Obsidian and claude.ai both do.
 
 ## How it works
 
-- Notes live in a GitHub repo as plain markdown files
-- This server wraps the GitHub API and exposes 4 MCP tools
-- Connect it to claude.ai as a custom connector
-- Edit notes in Obsidian (Mac + iOS) — Claude can read and update them too
+```
+       ┌──────────────┐         ┌──────────────┐
+       │  Obsidian    │◄───────►│   GitHub     │
+       │ (Mac + iOS)  │  git    │  your-notes  │
+       └──────────────┘         └──────┬───────┘
+                                       │ API
+                                       ▼
+                              ┌──────────────────┐
+                              │  MCP server      │
+                              │  (this repo)     │
+                              │  on Fly.io       │
+                              └────────┬─────────┘
+                                       │ MCP
+                                       ▼
+                              ┌──────────────────┐
+                              │   claude.ai      │
+                              │  custom connector│
+                              └──────────────────┘
+```
 
-## MCP tools
+Four tools Claude can call:
 
 | Tool | What it does |
 |------|-------------|
-| `list_notes(folder?)` | Lists all `.md` files, optionally filtered by folder |
-| `read_note(path)` | Returns the full content of a note |
-| `write_note(path, content, commit_message?)` | Creates or updates a note |
-| `search_notes(query)` | Case-insensitive search across all notes, returns snippets |
+| `list_notes(folder?)` | List all markdown files, optionally filtered |
+| `read_note(path)` | Read a note's content |
+| `write_note(path, content, commit_message?)` | Create or update a note |
+| `search_notes(query)` | Case-insensitive search across all notes |
+
+Every write is a git commit, so you have full history and can roll anything back.
 
 ---
 
-## Deploy to Fly.io
+## Setup
 
-### Prerequisites
+You'll need: a GitHub account, [flyctl](https://fly.io/docs/hands-on/install-flyctl/), and Obsidian.
 
-- [flyctl](https://fly.io/docs/hands-on/install-flyctl/)
-- A GitHub repo for your notes
-- A GitHub Personal Access Token with `repo` scope
+### 1. Make a notes repo
 
-### 1. Create the GitHub PAT
+Create an empty private repo on GitHub — e.g. `youruser/notes`. This is where your notes will live.
 
-Go to github.com/settings/tokens → Generate new token (classic) → check **repo** → copy the token.
+### 2. Make a GitHub PAT
 
-### 2. Launch the app
+github.com/settings/tokens → **Generate new token (classic)** → check **`repo`** → generate and copy the token. You'll use it twice: once for the server, once for Obsidian.
 
-```bash
-fly launch   # first time only — creates fly.toml and provisions the app
-```
-
-### 3. Set secrets
+### 3. Deploy the server
 
 ```bash
-# Random token that goes in your claude.ai connector URL
-fly secrets set MCP_TOKEN=$(openssl rand -hex 32)
+git clone https://github.com/markmace/mcp-note-server
+cd mcp-note-server
+fly launch                       # accept defaults, but don't deploy yet
 
-fly secrets set GITHUB_TOKEN=ghp_your_pat_here
-fly secrets set GITHUB_REPO=youruser/your-notes-repo
-```
+fly secrets set \
+  MCP_TOKEN=$(openssl rand -hex 32) \
+  GITHUB_TOKEN=ghp_your_pat_here \
+  GITHUB_REPO=youruser/notes
 
-### 4. Deploy
-
-```bash
 fly deploy
 ```
 
-### 5. Add to claude.ai
-
-1. **Settings → Connectors → Add custom connector**
-2. URL: `https://<app-name>.fly.dev/mcp/<MCP_TOKEN>`
-3. Save. No OAuth needed. Works on web and mobile.
-
----
-
-## Obsidian setup (Mac)
-
-Obsidian + Obsidian Git is the recommended way to edit notes locally.
-
-### 1. Clone the notes repo
+Grab the URL it prints. Then:
 
 ```bash
-git clone https://github.com/youruser/your-notes-repo ~/notes
+fly secrets list  # MCP_TOKEN is hidden, but you can read it once after setting:
+# (or just remember the value you set above)
 ```
 
-### 2. Open as vault
+### 4. Connect Claude
 
-Open Obsidian → "Open folder as vault" → select the cloned folder.
+In claude.ai: **Settings → Connectors → Add custom connector**
 
-### 3. Install Obsidian Git
+URL: `https://<your-app>.fly.dev/mcp/<your-MCP_TOKEN>`
 
-Community Plugins → Browse → search "Obsidian Git" (by Vinzent03) → Install → Enable.
+Save. Now ask Claude "list my notes" — should come back empty since you haven't made any yet.
 
-### 4. Configure the plugin
+### 5. Obsidian on Mac
 
-Go to Settings → Obsidian Git and set:
-
-| Setting | Value |
-|---|---|
-| Auto commit-and-sync interval | 10 |
-| Auto pull interval | 10 |
-| Pull on startup | ✅ |
-| Push on commit-and-sync | ✅ |
-| Auto commit-and-sync after file edits | ✅ |
-
-Under **Authentication/Commit Author**:
-- Username: your GitHub username
-- Password: your GitHub PAT (`ghp_...` with `repo` scope)
-
-macOS caches the token in Keychain after the first successful push.
-
-### 5. Add a .gitignore to the vault
-
-Create `.gitignore` in the vault root to avoid syncing Obsidian workspace state:
-
+```bash
+git clone https://github.com/youruser/notes ~/notes
+gh auth setup-git   # tells git to use the gh CLI for HTTPS auth
 ```
-.obsidian/workspace.json
-.obsidian/workspace-mobile.json
-.trash/
-```
+
+Then in Obsidian:
+1. **Open folder as vault** → pick `~/notes`
+2. **Settings → Community plugins → Turn on**
+3. Browse → install **Git** by Vinzent03 → Enable
+4. **Settings → Git** — these are the settings worth changing:
+
+   | Setting | Value |
+   |---|---|
+   | Auto commit-and-sync interval | `5` minutes |
+   | Auto commit-and-sync after stopping file edits | ✅ on |
+   | Pull on startup | ✅ on (default) |
+   | Auto pull interval | leave at `0` |
+
+5. Add a `.gitignore` to the vault root:
+   ```
+   .obsidian/workspace.json
+   .obsidian/workspace-mobile.json
+   .obsidian/plugins/obsidian-git/data.json
+   .trash/
+   ```
+   That last line matters — it's where the iOS plugin stores your PAT.
+
+6. Commit your `.obsidian/` config so iOS picks up the plugin automatically:
+   ```bash
+   git -C ~/notes add .obsidian/ .gitignore
+   git -C ~/notes commit -m "Obsidian config"
+   git -C ~/notes push
+   ```
+
+7. (Optional) Move any README in your notes repo into `.github/README.md` — GitHub still renders it on the repo page, but Obsidian hides dot-folders by default, so it won't clutter your vault.
+
+### 6. Obsidian on iOS
+
+This one has more sharp edges. Read the whole step before tapping anything.
+
+1. Install Obsidian on iPhone, create a new **empty** vault
+2. **Settings → Community plugins → Turn on**, then install **Git** by Vinzent03 and enable it
+3. **Settings → Git → Authentication/Commit Author** — enter your GitHub username and the PAT from step 2. **This must happen before the clone, not during.** The iOS plugin won't prompt mid-clone.
+4. Open the command palette (swipe down on the note area) → **"Clone an existing remote repo"**
+5. URL: `https://github.com/youruser/notes` (double-check for typos — most failures are this)
+6. Vault root: leave blank
+7. "Does your remote contain a .obsidian folder?" → **Yes**
+8. "To avoid conflicts..." → **Delete all your local config and plugins** (your iOS vault is empty anyway)
+9. After the clone finishes, **close and reopen Obsidian** — the plugin reload during a clone can show a spurious error that goes away after a restart
+
+iOS doesn't background-sync. Before you put your phone down, swipe down → **"Git: Commit all changes and sync"** to push.
 
 ---
 
-## Obsidian setup (iOS)
+## Daily use
 
-The plugin uses its own JS git implementation on iOS — no system git required.
+Edit notes in Obsidian like normal. Ask Claude things like:
 
-1. Install Obsidian on iPhone
-2. Enable Obsidian Git in Community Plugins
-3. Settings → Obsidian Git → **Authentication/Commit Author** → enter GitHub username and PAT
-4. Tap **"Clone an existing remote repo"** → enter `https://github.com/youruser/your-notes-repo`
+- "Clean up my standup notes from this week"
+- "Search my notes for anything I wrote about the migration"
+- "Add today's meeting notes to `work/standup.md`"
+- "What's in my ideas folder?"
 
-iOS doesn't background-sync. Use the command palette → "Obsidian Git: Commit all changes and sync" manually before closing the app.
+Claude's edits show up in Obsidian on next pull (5 min by default, or pull manually).
 
----
-
-## Local dev
+## Local development
 
 ```bash
 uv sync
-
 export MCP_TOKEN=dev GITHUB_TOKEN=ghp_... GITHUB_REPO=youruser/notes
 uv run uvicorn main:app --reload
 ```
@@ -135,10 +165,18 @@ uv run uvicorn main:app --reload
 ## File layout
 
 ```
-main.py        — FastAPI app + token auth middleware + CORS
-mcp_server.py  — 4 MCP tools
-github_api.py  — GitHub Contents API client
+main.py        — FastAPI + ASGI middleware (token auth, CORS, path rewriting)
+mcp_server.py  — the 4 MCP tools
+github_api.py  — thin GitHub Contents API client
 auth.py        — constant-time token comparison
 Dockerfile
 fly.toml
 ```
+
+## A note on cost
+
+Fly.io's free tier covers this comfortably — 256MB RAM, one shared CPU, auto-stops when idle. GitHub API calls are well under the 5000/hour rate limit unless you're really hammering it. The whole thing runs for $0/month for personal use.
+
+## License
+
+MIT — do whatever you want with it.
