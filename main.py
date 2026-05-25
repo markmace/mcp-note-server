@@ -1,4 +1,4 @@
-"""Obsidian Meets Claude — GitHub-backed notes, accessible to Claude via MCP."""
+"""Claude Meets Obsidian — GitHub-backed notes, accessible to Claude via MCP."""
 
 import os
 from contextlib import asynccontextmanager

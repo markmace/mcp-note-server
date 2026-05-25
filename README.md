@@ -1,8 +1,8 @@
-# Obsidian Meets Claude
+# Claude Meets Obsidian
 
 Give Claude a key to your Obsidian vault.
 
-> The repo is called `mcp-note-server` because that's what it technically is — an MCP server for notes. But the thing you're setting up is **Obsidian Meets Claude**: your notes, your editor, your AI, all on the same page.
+> The repo is called `mcp-note-server` because that's what it technically is — an MCP server for notes. But the thing you're setting up is **Claude Meets Obsidian**: your notes, your editor, your AI, all on the same page.
 
 ## Why
 
