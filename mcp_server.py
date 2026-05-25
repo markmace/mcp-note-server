@@ -6,7 +6,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 import github_api
 
 mcp = FastMCP(
-    "notes",
+    "Obsidian Meets Claude",
     transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
 )
 
